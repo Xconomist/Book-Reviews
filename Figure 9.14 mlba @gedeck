@@ -1,0 +1,49 @@
+if (!require(mlba)) {
+  library(devtools)
+  install_github("gedeck/mlba/mlba", force=TRUE)
+}
+options(scipen=999)
+
+library(rpart)
+library(rpart.plot)
+
+## Evaluating the Performance of a Classification Tree
+### Example 2: Acceptance of Personal Loan
+
+library(tidyverse)
+library(caret)
+
+## Regression Trees
+
+# select variables for regression
+outcome <- "Price"
+predictors <- c("Age_08_04", "KM", "Fuel_Type", "HP", "Met_Color", "Automatic",
+                "CC", "Doors", "Quarterly_Tax", "Weight")
+# reduce data set to first 1000 rows and selected variables
+car.df <- mlba::ToyotaCorolla[1:1000, c(outcome, predictors)]
+
+# partition data
+set.seed(1)  # set seed for reproducing the partition
+idx <- createDataPartition(car.df$Price, p=0.6, list=FALSE)
+car.train.df <- car.df[idx, ]
+car.holdout.df <- car.df[-idx, ]
+
+
+
+# use method "anova" for a regression model
+cv.rt <- rpart(Price ~ ., data=car.train.df, method="anova",
+               cp=0.00001, minsplit=5, xval=5)
+
+# prune by lower cp
+minErrorRow <- cv.rt$cptable[which.min(cv.rt$cptable[,"xerror"]), ]
+cutoff <- minErrorRow["xerror"] + minErrorRow["xstd"]
+best.cp <- cv.rt$cptable[cv.rt$cptable[,"xerror"] < cutoff,][1, "CP"]
+
+best.rt <- prune(cv.rt, cp=best.cp)
+
+# set digits to a negative number to avoid scientific notation
+rpart.plot(best.rt, extra=1, fallen.leaves=FALSE, digits=-4)
+
+pdf(width=7, height=4)
+rpart.plot(best.rt, extra=1, fallen.leaves=FALSE, digits=-4)
+dev.off()
